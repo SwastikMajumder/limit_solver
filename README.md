@@ -1,4 +1,5 @@
-double handed limit solver
+double handed limit solver <br>
+equation simplifier <br>
 run the main.py file to start the application
 ```
 >>> x+x+x*x
