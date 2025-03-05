@@ -4,6 +4,8 @@ class TreeNode:
     def __init__(self, name, children=None):
         self.name = name
         self.children = children or []
+    def __repr__(self):
+        return string_equation(str_form(self))
 def replace(equation, find, r):
   if str_form(equation) == str_form(find):
     return r
