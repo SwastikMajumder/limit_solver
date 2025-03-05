@@ -147,6 +147,7 @@ def common(eq):
                 con.append([num, den])
             else:
                 con.append([[child], []])
+                
         if len(con)>1 and any(x[1] != [] for x in con):
             a = TreeNode("f_add", [])
             for i in range(len(con)):
@@ -162,6 +163,8 @@ def common(eq):
                     a.children.append(b.children[0])
                 elif len(b.children) > 1:
                     a.children.append(b)
+                else:
+                    a.children.append(tree_form("d_1"))
             c = TreeNode("f_mul", [])
             for i in range(len(con)):
                 c.children += con[i][1]
@@ -173,17 +176,20 @@ def common(eq):
     for child in eq.children:
         arr.children.append(common(child))
     return arr
-                        
+   
 def solve(eq):
     eq = convert_sub2neg(eq)
+    eq = tree_form(eq)
     
-    eq = common(tree_form(eq))
-    
+    #eq = common(eq)
     eq= expand_eq(eq)
+    
     eq = inversehandle(eq)
     eq = inversehandle(eq)
     eq = flatten_tree(eq)
+    eq = simplify(eq)
     eq= expand_eq(eq)
+    
     return str_form(eq)
 class Eq:
     def __init__(self, string, format_type="stringequation"):
@@ -213,8 +219,9 @@ class Eq:
         if eq.name == "f_mul":
             for child in eq.children:
                 if child.name == "f_pow":
-                    if int(child.children[1].name[2:]) == -1:
-                        output.append(Eq("1")/Eq(child.children[0], "treeform"))
+                    if int(child.children[1].name[2:]) < 0:
+                        for i in range(-int(child.children[1].name[2:])):
+                            output.append(Eq("1")/Eq(child.children[0], "treeform"))
                     else:
                         for i in range(int(child.children[1].name[2:])):
                             output.append(Eq(child.children[0], "treeform"))
@@ -225,7 +232,8 @@ class Eq:
         return string_equation(self.equation)
 
 def substitute_val(eq, val):
-    return Eq(replace(tree_form(eq.equation), tree_form("v_0"), tree_form("d_"+str(val))), "treeform")
+    eq = replace(tree_form(eq.equation), tree_form("v_0"), tree_form("d_"+str(val)))
+    return eq
 
 def inversehandle(eq):
     if eq.name == "f_pow":
@@ -240,32 +248,39 @@ def inversehandle(eq):
 
 
 def simplify(eq):
+    if eq is None:
+        return None
     if all(x.name[:2] == "d_" for x in eq.children):
+        if eq.name == "f_sin":
+            if eq.children[0].name == "d_0":
+                return tree_form("d_0")
+        if eq.name == "f_cos":
+            if eq.children[0].name == "d_0":
+                return tree_form("d_1")
         if eq.name == "f_pow":
-            if int(eq.children[0].name[2:]) == 0 and int(eq.children[1].name[2:]) == 0:
+            if int(eq.children[0].name[2:]) == 0 and int(eq.children[1].name[2:]) <= 0:
                 return None
             if int(eq.children[1].name[2:]) > 0:
-                return int(eq.children[0].name[2:]) ** int(eq.children[1].name[2:])
+                n = int(eq.children[0].name[2:]) ** int(eq.children[1].name[2:])
+                return tree_form("d_"+str(n))
             if int(eq.children[1].name[2:]) == 0:
-                return str(int(eq.children[0].name[2:])/abs(int(eq.children[0].name[2:])))
+                return None
             if abs(int(eq.children[0].name[2:])) == 1 and int(eq.children[1].name[2:]) == -1:
                 return eq.children[0]
         elif eq.name == "f_add":
             arr = [int(x.name[2:]) for x in eq.children]
-            return sum(arr)
+            return tree_form("d_"+str(sum(arr)))
         elif eq.name == "f_mul":
             arr = [int(x.name[2:]) for x in eq.children]
             p = 1
             for item in arr:
                 p = p * item
-            return p
+            return tree_form("d_"+str(p))
     arr = TreeNode(eq.name, [])
     for child in eq.children:
         child = simplify(child)
         if child is None:
             return None
-        if isinstance(child, int):
-            child = tree_form("d_"+str(child))
         arr.children.append(child)
     return arr
 
@@ -317,9 +332,9 @@ def take_common(eq):
         final = final2 * final
         output = output * ans
     output = output*final
-    return Eq(simplify(tree_form(output.equation)), "treeform")    
+    return output 
         
-equation = None
+
 
 def expand(eq):
     if eq.name == "f_mul":
@@ -333,6 +348,182 @@ def expand(eq):
 
     return TreeNode(eq.name, [expand(child) for child in eq.children])
 
+def expand2(eq):
+    if eq.name == "f_mul":
+        addchild = [[Eq(child2, "treeform") for child2 in child.children] for child in eq.children if child.name == "f_add"]
+        otherchild = [Eq(child, "treeform") for child in eq.children if child.name != "f_add"]
+        other = Eq("1")
+        for item in otherchild:
+            other= other * item
+        if len(addchild) == 1 and isinstance(addchild, list):
+            add= Eq("0")
+            for item in addchild[0]:
+                add = add + other*item
+            return tree_form(add.equation)
+
+    return TreeNode(eq.name, [expand2(child) for child in eq.children])
+
+def numdem(equation):
+    num = Eq("1")
+    den = Eq("1")
+    for item in equation.factor():
+        t = tree_form(item.equation)
+        if t.name == "f_pow" and int(t.children[1].name[2:]) < 0:
+            den = den*item
+        else:
+            num = num*item
+    return [num, Eq("1")/den]
+
+def diff(equation):
+    eq = tree_form(equation.equation)
+    if "v_" not in str_form(eq):
+        return Eq("0")
+    if eq.name == "f_add":
+        add = Eq("0")
+        for child in eq.children:
+            add += diff(Eq(child, "treeform"))
+        return add
+    elif eq.name == "f_mul":
+        add = Eq("0")
+        for i in range(len(eq.children)):
+            new = copy.deepcopy(eq)
+            new.children.pop(i)
+            add += diff(Eq(eq.children[i], "treeform"))*Eq(new, "treeform")
+        return add
+    elif eq.name == "f_sin":
+        eq.name = "f_cos"
+        return diff(Eq(eq.children[0], "treeform"))*Eq(eq, "treeform")
+    elif eq.name == "f_cos":
+        eq.name = "f_sin"
+        return Eq("d_-1", "strform")*diff(Eq(eq.children[0], "treeform"))*Eq(eq, "treeform")
+    elif eq.name[:2] == "v_":
+        return Eq(TreeNode("f_dif", [eq]), "treeform")
+    elif eq.name == "f_pow" and eq.children[1].name[:2] == "d_":
+        base, power = eq.children
+        dbase = diff(Eq(base, "treeform"))
+        b1 = Eq(power, "treeform") - Eq("1")
+        bab1 = TreeNode("f_pow", [base, tree_form(b1.equation)])
+        return Eq(power, "treeform")*Eq(bab1, "treeform")*dbase
+def diffx2(equation):
+    eq = tree_form(equation.equation)
+    if eq.name == "f_dif":
+        if eq.children[0].name == "v_0":
+            return Eq("1")
+        return Eq("0")
+    return Eq(TreeNode(eq.name, [tree_form(diffx2(Eq(child, "treeform")).equation) for child in eq.children]), "treeform")
+def diffx(equation):
+    equation = diff(equation)
+    equation = diffx2(equation)
+    return equation
+def approx(equation):
+    con = True
+    while con:
+        con = False
+        for item in equation.factor():
+            if tree_form(item.equation).name == "f_sin":
+                if diffx(diffx(Eq(tree_form(item.equation).children[0], "treeform"))) != Eq("0"):
+                    continue
+                
+                equation = equation/item
+                equation = equation*Eq(tree_form(item.equation).children[0], "treeform")
+                con = True
+                break
+            elif tree_form(item.equation).name == "f_pow" and tree_form(item.equation).children[1].name == "d_-1" and tree_form(item.equation).children[0].name == "f_sin":
+                if diffx(diffx(Eq(tree_form(item.equation).children[0].children[0], "treeform"))) != Eq("0"):
+                    continue
+                equation = equation*Eq(tree_form(item.equation).children[0], "treeform")
+                equation = equation/Eq(tree_form(item.equation).children[0].children[0], "treeform")
+                con = True
+                break
+            elif tree_form(item.equation).name == "f_cos":
+                if diffx(diffx(Eq(tree_form(item.equation).children[0], "treeform"))) != Eq("0"):
+                    continue
+                equation = equation/item
+                x = Eq(tree_form(item.equation).children[0], "treeform")
+                equation = equation*(Eq("1")-x*x/Eq("2"))
+                con = True
+                break
+            elif tree_form(item.equation).name == "f_pow" and tree_form(item.equation).children[1].name == "d_-1" and tree_form(item.equation).children[0].name == "f_cos":
+                if diffx(diffx(Eq(tree_form(item.equation).children[0].children[0], "treeform"))) != Eq("0"):
+                    continue
+                equation = equation*Eq(tree_form(item.equation).children[0], "treeform")
+                x = Eq(tree_form(item.equation).children[0].children[0], "treeform")
+                equation = equation/(Eq("1")-x*x/Eq("2"))
+                con = True
+                break
+    return equation
+def subslimit(equation):
+    equation = Eq(expand2(tree_form(equation.equation)), "treeform")
+    equation = simplify(tree_form(equation.equation))
+    if equation is None:
+        return None
+    equation = Eq(equation, "treeform")
+    equation = substitute_val(equation, 0)
+    equation = simplify(equation)
+    equation = simplify(equation)
+    if equation is None:
+        return None
+    return Eq(equation, "treeform")
+def lhostpital(equation):
+    equation = simplify(tree_form(equation.equation))
+    
+    if equation is None:
+        return None
+    equation = Eq(equation, "treeform")
+    e = substitute_val(equation, 0)
+    e = simplify(e)
+    e = simplify(e)
+    if e is None:
+        n, d = numdem(equation)
+        ans1 = subslimit(n)
+        ans2 = subslimit(d)
+        if ans1 is not None and ans2 is not None and ans1 == Eq("0") and ans2 == Eq("0"):
+            equation = diffx(n)/diffx(d)
+            return equation
+        return None
+    return None
+def additionlimit(equation):
+    equation = Eq(expand2(tree_form(equation.equation)), "treeform")
+
+    final = Eq("0")
+    equation = tree_form(equation.equation)
+    if equation.name == "f_add":
+        for child in equation.children:
+            tmp = find_limit(Eq(child, "treeform"))
+            if tmp is not None:
+                final += tmp
+            else:
+                final = None
+                break
+    else:
+        final = None
+    return final
+def approx_limit(equation):
+    orig = equation
+    equation = approx(equation)
+    if orig == equation:
+        return None
+    return equation
+def find_limit(equation,depth=3):
+    ans = subslimit(equation)
+    if ans is not None and "v_0" not in ans.equation:
+        if "v_" in equation.equation.replace("v_0", ""):
+            if "v_0" not in equation.equation:
+                return equation
+        else:
+            return ans
+    if depth == 0:
+        return None
+    
+    for item in [lhostpital,additionlimit,approx_limit]:
+        ans = item(equation)
+        if ans is not None:
+            out = find_limit(ans, depth-1)
+            if out is not None:
+                return out
+    return None
+
+equation = None
 while True:
     tmp = input(">>> ")
     try:
@@ -342,33 +533,13 @@ while True:
                 print(item)
         elif tmp == "show":
             print(equation)
+        elif tmp == "d/dx":
+            print(diffx(equation))
         elif tmp == "limit 0":
             
-            orig = equation
-
-            def approx(eq):
-                if eq.name == "f_sin":
-                    return eq.children[0]
-                elif eq.name == "f_cos":
-                    x = Eq(eq.children[0], "treeform")
-                    return tree_form((Eq("1") - (x * x / Eq("2"))).equation)
-                arr = TreeNode(eq.name, [])
-                for child in eq.children:
-                    arr.children.append(approx(child))
-                return arr
-            equation = Eq(approx(tree_form(equation.equation)), "treeform")
-            equation = Eq(approx(tree_form(equation.equation)), "treeform")
-            equation = Eq(expand(tree_form(equation.equation)), "treeform")
-            equation = Eq(expand(tree_form(equation.equation)), "treeform")
-            equation2 = equation
-            e = simplify(tree_form(substitute_val(equation, 0).equation))
-            if isinstance(e, int):
-                e = tree_form("d_"+str(e))
-            equation = Eq(e, "treeform")
-            print("limit x->0 " + str(orig) + " = " + str(equation2) + " = " + str(equation))
-            equation = orig
+            print("limit x->0 " + str(equation) + " = " + str(find_limit(equation)))
         else:
-            equation = Eq(tmp)
+            equation = Eq(tmp,"stringequation")
             equation = Eq(replace_eq(tree_form(equation.equation)), "treeform")
             
             equation = take_common(equation)
