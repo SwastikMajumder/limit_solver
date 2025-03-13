@@ -47,10 +47,12 @@ def string_equation_helper(equation_tree):
         s+= string_equation_helper(copy.deepcopy(child)) + sign[equation_tree.name]
     s = s[:-1] + ")"
     return s
-def string_equation(eq): 
+def string_equation(eq):
     eq = eq.replace("v_0", "x")
     eq = eq.replace("v_1", "y")
     eq = eq.replace("v_2", "z")
     eq = eq.replace("d_", "")
+    eq = eq.replace("v_", "")
+    eq = eq.replace("'", "")
     
     return string_equation_helper(tree_form(eq))
