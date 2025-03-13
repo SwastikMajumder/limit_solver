@@ -1,8 +1,114 @@
+import math
 import copy
 import itertools
 from base import *
 from fractions import Fraction
+def int2(string):
+    if "√" in string:
+        return math.isqrt(int(string.replace("√", "")))
+    return int(string)
+class Fraction2:
+    def __init__(self, num, mode="nonsqrt"):
+        
+        if isinstance(num, Fraction2):
+            self.num = num.num
+            return
+        elif isinstance(num, int):
+            num = Fraction(num)
+        elif isinstance(num, float):
+            num = Fraction.from_float(num)  # Correct float conversion
+        elif isinstance(num, str):
+            if "√" in num:
+                mode = "sqrt"
+                num = num.replace("√", "")
+            num = Fraction(num)  # Assuming valid fraction string
+            
+        if mode == "sqrt":
+            self.num = num
+        else:
+            if num == 0:
+                self.num = 0
+            else:
+                self.num = num * abs(num)
+                
+    def __neg__(self):
+        return Fraction2(-self.num, "sqrt")
+    def __add__(self, other):
+        self, other = Fraction2.convert([self, other])
+        
+        if self.num * other.num == 0:
+            sgn = 1
+        else:
+            sgn = self.num * other.num / abs(self.num * other.num)
+        n = 4 * abs(self.num * other.num)
+        sgn2 = 1
+        if self.num + other.num < 0:
+            sgn2 = -1
+        return Fraction2(sgn2 * (abs(self.num) + abs(other.num) + sgn*n**Fraction(1,2)), "sqrt")
+    def sqrt(self):
+        n = Fraction2(self.num, "sqrt").num
+        if not isinstance(n, Fraction):
+            n = Fraction(n)
+        a = perfect_square_root(n.numerator)
+        b = perfect_square_root(n.denominator)
+        if a is None or b is None:
+            return False
+        self.num = Fraction2(Fraction(a,b), "sqrt").num
+        return True
+    @staticmethod
+    def convert(term):
+        output = []
+        for item in term:
+            if not isinstance(item, Fraction2):
+                output.append(Fraction2(item))
+            else:
+                output.append(item)
+        return output
+    def __mul__(self, other):
+        self, other = Fraction2.convert([self, other])
+        ans = Fraction2(self.num * other.num, "sqrt")
+        return ans
+    def __abs__(self):
+        return Fraction2(abs(self.num), "sqrt")
+    
+    def __pow__(self, other):
+        self, other = Fraction2.convert([self, other])
+        
+        ans = Fraction2(self.num ** other.num, "sqrt")
+        return ans
 
+    def __truediv__(self, other):
+        return Fraction2(self.num / other.num, "sqrt")
+
+    def __radd__(self, other):
+        return self.__add__(Fraction2(other))
+
+    def __rmul__(self, other):
+        return self.__mul__(Fraction2(other))
+    
+    def __lt__(self, other):
+        other = Fraction2(other) if not isinstance(other, Fraction2) else other
+        return self.num < other.num
+    
+    def __eq__(self, other):
+        other = Fraction2(other) if not isinstance(other, Fraction2) else other
+        return self.num == other.num
+
+    def __gt__(self, other):
+        other = Fraction2(other) if not isinstance(other, Fraction2) else other
+        return self.num > other.num
+    def __ge__(self, other):
+        if not isinstance(other, Fraction2):
+            other = Fraction2(other)  # Convert other to Fraction2 if necessary
+        return self.num >= other.num
+    def __repr__(self):
+        s = str(self.num)
+        if "√" not in s:
+            if "-" in s:
+                s = "-√"+s[1:]
+            else:
+                s = "√"+s
+        return s
 def flatten_tree(node):
     if not node.children:
         return node
@@ -29,6 +135,8 @@ def convert_sub2neg(eq):
         term = TreeNode(eq.name, [])
         for child in eq.children:
             term.children.append(a1(child))
+        if len(term.children)==1:
+            return term.children[0]
         return term
 
     def a2(eq):
@@ -39,45 +147,97 @@ def convert_sub2neg(eq):
         term = TreeNode(eq.name, [])
         for child in eq.children:
             term.children.append(a2(child))
+        if len(term.children)==1:
+            return term.children[0]
         return term
     eq = tree_form(eq)
     while "f_sub" in str_form(eq) or "f_div" in str_form(eq):
         eq = a1(eq)
     eq = flatten_tree(eq)
     while "f_neg" in str_form(eq) or "f_inv" in str_form(eq):
-        eq = a2(eq)
+        eq = a2(eq) 
         
     return str_form(eq)
+def is_str_n(s, eq=None):
+    s = tree_form(s)
+    if s.name[:2] == "d_":
+        if eq is None:
+            return int2(s.name[2:])
+        else:
+            return int2(s.name[2:])==eq
+    if eq is None:
+        return None
+    return False
+def calc(eq):
+    
+    if eq.name[:2] == "d_":
+        return Fraction2(eq.name[2:])
+    elif eq.name == "f_pow":
+        a = calc(eq.children[0])
+        b = calc(eq.children[1])
+        if a is None or b is None:
+            return None
+        if b==Fraction2(Fraction(1,2)):
+            if a.sqrt():
+                return a
+            else:
+                return None
+        s = b.num
+        if not isinstance(s, Fraction):
+            s = Fraction(s)
+        if s.denominator == 1:
+            b.sqrt()
+            
+            return Fraction2(a.num**b.num, "sqrt")
+        return None
+    elif eq.name == "f_mul":
+        p = 1
+        for child in eq.children:
+            tmp = calc(child)
+            if tmp is not None:
+                p *= tmp
+            else:
+                return None
+        return p
+    elif eq.name == "f_add":
+        p = 0
+        for child in eq.children:
+            tmp  = calc(child)
+            if tmp is not None:
+                p += tmp
+            else:
+                return None
+        return p
+    return None
 
 def simple(eq):
+    global gg
     if (eq.name[:2] == "f_" and eq.name != "f_add") or eq.name[:2] in ["d_","v_"]:
-        eq = TreeNode("f_add", [eq])
+        eq = copy.deepcopy(TreeNode("f_add", [eq]))
+    
     if eq.name == "f_add":
         dic = {}
         num3 = 0
+        
         for i in range(len(eq.children)-1,-1,-1):
-            if eq.children[i].name[:2] == "d_":
-                num3 += Fraction(eq.children[i].name[2:])
-                eq.children.pop(i)
-            elif eq.children[i].name == "f_pow" and eq.children[i].children[0].name[:2]=="d_" and Fraction(eq.children[i].children[1].name[2:]) < 0:
-                num3 += 1/(Fraction(eq.children[i].children[0].name[2:])**(-Fraction(eq.children[i].children[1].name[2:])))
+            tmp = calc(eq.children[i])
+            if tmp is not None:
+                num3 += tmp
                 eq.children.pop(i)
         for child in eq.children:
             num = 1
             if child.name == "f_mul":
                 for i in range(len(child.children)-1,-1,-1):
-                    if child.children[i].name[:2] == "d_":
-                        num *= Fraction(child.children[i].name[2:])
-                        child.children.pop(i)
-                    elif child.children[i].name == "f_pow" and child.children[i].children[0].name[:2]=="d_" and Fraction(child.children[i].children[1].name[2:]) < 0:
-                        num *= 1/(Fraction(child.children[i].children[0].name[2:])**(-Fraction(child.children[i].children[1].name[2:])))
+                    tmp = calc(child.children[i])
+                    if tmp is not None:
+                        num *= tmp
                         child.children.pop(i)
                 dic2 = {}
                 for i in range(len(child.children)-1,-1,-1):
                     num2 = 1
                     child2 = str_form(child.children[i])
                     if child.children[i].name == "f_pow" and child.children[i].children[1].name[:2]== "d_":
-                        num2 = Fraction(child.children[i].children[1].name[2:])
+                        num2 = Fraction2(child.children[i].children[1].name[2:])
                         child2 = str_form(child.children[i].children[0])
                     if child2 not in dic2.keys():
                         dic2[child2] = num2
@@ -114,7 +274,7 @@ def simple(eq):
                 newchild.children.append(TreeNode("f_mul", [tree_form("d_"+str(dic[key])), tree_form(key)]))
         for i in range(len(newchild.children)-1,-1,-1):
             if newchild.children[i].name[:2] == "d_":
-                num3 += Fraction(newchild.children[i].name[2:])
+                num3 += Fraction2(newchild.children[i].name[2:])
                 newchild.children.pop(i)
         if num3 != 0:
             x = tree_form("d_"+str(num3))
@@ -130,25 +290,71 @@ def simple(eq):
         for i in range(len(new.children)):
             new.children[i] = simple(copy.deepcopy(new.children[i]))
         return new
-def expand_eq(eq):
-    #eq = tree_form(eq)
-    eq = simple(eq)
-    def frac(eq):
-        if eq.name[:2] == "d_":
-            n = Fraction(eq.name[2:])
-            if n.denominator == 1:
-                return tree_form("d_"+str(n.numerator))
-            elif n.numerator == 1:
-                b = tree_form("d_"+str(n.denominator))
-                b = TreeNode("f_pow", [b, tree_form("d_-1")])
-                return b
+
+def perfect_square_root(n):
+    try:
+        root = math.isqrt(n)
+    except Exception as e:
+        return None
+    return root if root * root == n else None
+
+def treesqrt(num): 
+    b = TreeNode("f_pow", [tree_form("d_"+str(abs(num))), TreeNode("f_pow", [tree_form("d_2"), tree_form("d_-1")] ) ] )
+    if num < 0:
+        return TreeNode("f_mul", [tree_form("d_-1"), b])
+    return b
+def frac(eq):
+    if eq.name[:2] == "d_":
+        n = Fraction2(eq.name[2:])
+        n2 = n.num
+        if not isinstance(n2, Fraction):
+            n2 = Fraction(n2)
+        if n2.denominator == 1:
+            s = perfect_square_root(n2.numerator)
+            if s is None:
+                return treesqrt(n2.numerator)
             else:
-                a = tree_form("d_"+str(n.numerator))
-                b = tree_form("d_"+str(n.denominator))
-                b = TreeNode("f_pow", [b, tree_form("d_-1")])
-                return TreeNode("f_mul", [a,b])
-        return TreeNode(eq.name, [frac(child) for child in eq.children])
-    return frac(eq)
+                return tree_form("d_"+str(s))
+        elif n2.numerator == 1:
+            b = None
+            s = perfect_square_root(n2.denominator)
+            if s is None:
+                b = treesqrt(n2.denominator)
+            else:
+                b = tree_form("d_"+str(s))
+                
+            b = TreeNode("f_pow", [b, tree_form("d_-1")])
+            return b
+        else:
+            b = None
+            s = perfect_square_root(n2.denominator)
+            if s is None:
+                b = treesqrt(n2.denominator)
+            else:
+                b = tree_form("d_"+str(s))
+
+            a = None
+            a = perfect_square_root(n2.numerator)
+            if s is None:
+                a = treesqrt(n2.numerator)
+            else:
+                a = tree_form("d_"+str(s))
+            return TreeNode("f_mul", [a,b])
+    return TreeNode(eq.name, [frac(child) for child in eq.children])
+
+def expand_eq(eq):
+    global gg
+    
+    
+    eq = simple(eq)
+    
+    gg = False
+    if "√" in str_form(eq):
+        eq = frac(eq)
+        eq = simplify(eq)
+        eq = simplify(eq)
+    
+    return eq
 
 def common(eq):
     
@@ -159,8 +365,8 @@ def common(eq):
                 num = []
                 den = []
                 for child2 in child.children:
-                    if child2.name == "f_pow" and child2.children[1].name[:2] == "d_" and int(child2.children[1].name[2:])<0:
-                        n = int(child2.children[1].name[2:])
+                    if child2.name == "f_pow" and child2.children[1].name[:2] == "d_" and int2(child2.children[1].name[2:])<0:
+                        n = int2(child2.children[1].name[2:])
                         if n == -1:
                             den.append(child2.children[0])
                         else:
@@ -211,7 +417,9 @@ def solve(eq):
     eq = flatten_tree(eq)
     eq = simplify(eq)
     eq = expand_eq(eq)
+    
     eq = simp(eq)
+    
     return str_form(eq)
 
 #1/tan(x)-tan(x)-2/tan((2*x))
@@ -234,7 +442,7 @@ def simp(eq):
         return eq
 class Eq:
     def __init__(self, string, format_type="stringequation"):
-        if format_type=="stringequation":
+        if format_type=="stringequation":        
             self.equation= solve(parser.take_input(string))
         elif format_type=="treeform":
             self.equation= solve(str_form(string))
@@ -244,7 +452,13 @@ class Eq:
         x = (self-other).equation
         
         return x=="d_0"
+    @staticmethod
+    def convert(term):
+        return [Eq("d_" + str(item), "strform") if isinstance(item, int) else item for item in term]
+    def __neg__(self):
+        return Eq(solve(str_form(TreeNode("f_mul", [tree_form(self.equation),tree_form("d_-1")]))), "strform")
     def __sub__(self, other):
+        
         return Eq(solve(str_form(TreeNode("f_sub", [tree_form(self.equation),tree_form(other.equation)]))), "strform")
     def __add__(self, other):
         return Eq(solve(str_form(TreeNode("f_add", [tree_form(self.equation),tree_form(other.equation)]))), "strform")
@@ -252,6 +466,17 @@ class Eq:
         return Eq(solve(str_form(TreeNode("f_div", [tree_form(self.equation),tree_form(other.equation)]))), "strform")
     def __mul__(self, other):
         return Eq(solve(str_form(TreeNode("f_mul", [tree_form(self.equation),tree_form(other.equation)]))), "strform")
+    def __pow__(self, other):
+        self, other = Eq.convert([self, other])
+        return Eq(solve(str_form(TreeNode("f_pow", [tree_form(self.equation),tree_form(other.equation)]))), "strform")
+    def __rmul__(self, other):
+        return self.__mul__(Eq("d_"+str(other), "strform"))
+    def __radd__(self, other):
+        return self.__add__(Eq("d_"+str(other), "strform"))
+    def __rpow__(self, other):
+        return self.__pow__(Eq("d_"+str(other), "strform"))
+    def fx(self, fxname):
+        return Eq(TreeNode("f_"+fxname, [tree_form(self.equation)]), "treeform")
     def factor(self):
         output = []
         eq = tree_form(self.equation)
@@ -260,11 +485,11 @@ class Eq:
         if eq.name == "f_mul":
             for child in eq.children:
                 if child.name == "f_pow":
-                    if int(child.children[1].name[2:]) < 0:
-                        for i in range(-int(child.children[1].name[2:])):
+                    if int2(child.children[1].name[2:]) < 0:
+                        for i in range(-int2(child.children[1].name[2:])):
                             output.append(Eq("1")/Eq(child.children[0], "treeform"))
                     else:
-                        for i in range(int(child.children[1].name[2:])):
+                        for i in range(int2(child.children[1].name[2:])):
                             output.append(Eq(child.children[0], "treeform"))
                 else:
                     output.append(Eq(child, "treeform"))
@@ -277,21 +502,25 @@ def substitute_val(eq, val):
     return eq
 
 def inversehandle(eq):
-    if eq.name == "f_pow":
+    if eq.name == "f_pow" and eq.children[1].name[:2] == "d_":
         base, exponent = eq.children
         if base.name == "f_pow":
-            n = int(exponent.name[2:]) * int(base.children[1].name[2:])
+            n = int2(exponent.name[2:]) * int2(base.children[1].name[2:])
             return base.children[0] if n == 1 else TreeNode("f_pow", [base.children[0], tree_form(f"d_{n}")])
         elif base.name == "f_mul":
             return TreeNode("f_mul", [TreeNode("f_pow", [child, exponent]) for child in base.children])
     arr = TreeNode(eq.name, [inversehandle(child) for child in eq.children])
     return arr
 
-
-
 def simplify(eq):
     if eq is None:
         return None
+    if eq.name == "f_pow" and eq.children[0].name[:2] == "d_" and eq.children[1].name == "f_pow":
+        
+        if str_form(eq.children[1]) == "f_pow\n d_2\n d_-1":
+            n = perfect_square_root(is_str_n(eq.children[0].name))
+            if n is not None:
+                return tree_form("d_"+str(n))
     if all(x.name[:2] == "d_" for x in eq.children):
         if eq.name == "f_sin":
             if eq.children[0].name == "d_0":
@@ -300,20 +529,20 @@ def simplify(eq):
             if eq.children[0].name == "d_0":
                 return tree_form("d_1")
         if eq.name == "f_pow":
-            if int(eq.children[0].name[2:]) == 0 and int(eq.children[1].name[2:]) <= 0:
+            if int2(eq.children[0].name[2:]) == 0 and int2(eq.children[1].name[2:]) <= 0:
                 return None
-            if int(eq.children[1].name[2:]) > 0:
-                n = int(eq.children[0].name[2:]) ** int(eq.children[1].name[2:])
+            if int2(eq.children[1].name[2:]) > 0:
+                n = int2(eq.children[0].name[2:]) ** int2(eq.children[1].name[2:])
                 return tree_form("d_"+str(n))
-            if int(eq.children[1].name[2:]) == 0:
+            if int2(eq.children[1].name[2:]) == 0:
                 return None
-            if abs(int(eq.children[0].name[2:])) == 1 and int(eq.children[1].name[2:]) == -1:
+            if abs(int2(eq.children[0].name[2:])) == 1 and int2(eq.children[1].name[2:]) == -1:
                 return eq.children[0]
         elif eq.name == "f_add":
-            arr = [int(x.name[2:]) for x in eq.children]
+            arr = [int2(x.name[2:]) for x in eq.children]
             return tree_form("d_"+str(sum(arr)))
         elif eq.name == "f_mul":
-            arr = [int(x.name[2:]) for x in eq.children]
+            arr = [int2(x.name[2:]) for x in eq.children]
             p = 1
             for item in arr:
                 p = p * item
@@ -430,7 +659,7 @@ def expand(eq):
 
     return TreeNode(eq.name, [expand(child) for child in eq.children])
 
-def expand2(eq):
+def expand3(eq):
     if eq.name == "f_mul":
         addchild = [[Eq(child2, "treeform") for child2 in child.children] for child in eq.children if child.name == "f_add"]
         otherchild = [Eq(child, "treeform") for child in eq.children if child.name != "f_add"]
@@ -443,14 +672,54 @@ def expand2(eq):
                 add = add + other*item
             return tree_form(add.equation)
 
+    return TreeNode(eq.name, [expand3(child) for child in eq.children])
+def expand2(eq):
+    orig = None
+    if eq.name == "f_mul" or eq.name == "f_pow":
+        if eq.name == "f_pow":
+            orig = copy.deepcopy(eq)
+            eq = TreeNode("f_pow", [eq]) 
+        ac = []
+        addchild = []
+        for child in eq.children:
+            ac += [tree_form(x.equation) for x in Eq(child, "treeform").factor()]
+        for child in ac:
+            tmp2 = []
+            if child.children != []:
+                for child2 in child.children:
+                    tmp2.append(Eq(child2, "treeform"))
+            else:
+                tmp2 = [Eq(child, "treeform")]
+            if tmp2 != []:
+                addchild.append(tmp2)
+        def flatten(lst):
+            flat_list = []
+            for item in lst:
+                if isinstance(item, list) and item == []:
+                    continue
+                if isinstance(item, list):
+                    flat_list.extend(flatten(item))
+                else:
+                    flat_list.append(item)
+            return flat_list
+        if isinstance(addchild, list) and len(flatten(addchild))>0:
+            add= Eq("0")
+            for item in itertools.product(*addchild):
+                mul = Eq("1")
+                for item2 in item:
+                    mul = mul * item2
+                add = add + mul
+            return tree_form(add.equation)
+        return other
+    if orig is not None:
+        eq = orig
     return TreeNode(eq.name, [expand2(child) for child in eq.children])
-
 def numdem(equation):
     num = Eq("1")
     den = Eq("1")
     for item in equation.factor():
         t = tree_form(item.equation)
-        if t.name == "f_pow" and int(t.children[1].name[2:]) < 0:
+        if t.name == "f_pow" and int2(t.children[1].name[2:]) < 0:
             den = den*item
         else:
             num = num*item
@@ -470,6 +739,8 @@ def diff(equation):
         for i in range(len(eq.children)):
             new = copy.deepcopy(eq)
             new.children.pop(i)
+            if len(new.children)==1:
+                new = new.children[0]
             add += diff(Eq(eq.children[i], "treeform"))*Eq(new, "treeform")
         return add
     elif eq.name == "f_sin":
@@ -486,22 +757,25 @@ def diff(equation):
         b1 = Eq(power, "treeform") - Eq("1")
         bab1 = TreeNode("f_pow", [base, tree_form(b1.equation)])
         return Eq(power, "treeform")*Eq(bab1, "treeform")*dbase
-def diffx2(equation):
-    eq = tree_form(equation.equation)
-    if eq.name == "f_dif":
-        if eq.children[0].name == "v_0":
-            return Eq("1")
-        return Eq("0")
-    return Eq(TreeNode(eq.name, [tree_form(diffx2(Eq(child, "treeform")).equation) for child in eq.children]), "treeform")
+def diffx2(equation, var="v_0"):
+    if equation.name == "f_dif":
+        if equation.children[0].name == var:
+            return tree_form("d_1")
+        return tree_form("d_0")
+    return TreeNode(equation.name, [diffx2(child) for child in equation.children])
 def diffany(equation):
     eq = tree_form(equation.equation)
     if eq.name == "f_dif":
         if eq.children[0].name[:2] == "v_":
             return Eq("1")
     return Eq(TreeNode(eq.name, [tree_form(diffany(Eq(child, "treeform")).equation) for child in eq.children]), "treeform")
-def diffx(equation):
+def diffx(equation, var="v_0"):
+    
     equation = diff(equation)
-    equation = diffx2(equation)
+    equation = tree_form(equation.equation)
+    
+    equation = diffx2(equation, var)
+    equation = Eq(equation, "treeform")
     return equation
 def diffany2(equation):
     equation = diff(equation)
@@ -591,6 +865,40 @@ def additionlimit(equation):
         final = None
     return final
 
+def integratex(equation):
+    if diffx(equation) == Eq("0"):
+        return Eq("x")*equation
+    def varproc(term):
+        if tree_form(diffx(term).equation).name[:2] == "d_":
+            return diffx(term)
+        return None
+    const = [x for x in equation.factor() if "v_0" not in x.equation]
+    tmp = Eq("1")
+    for item in const:
+        tmp = tmp * item
+    const = tmp
+    
+    if const != Eq("1"):
+        return const*integratex(equation/const)
+    
+    eq = tree_form(equation.equation)
+    if eq.name == "f_add":
+        return sum([integratex(Eq(child, "treeform")) for child in eq.children])
+    if eq.name == "v_0":
+        return Eq("x^2/2")
+    if eq.name == "f_pow" and eq.children[1].name[:2] == "d_" and int(eq.children[1].name[2:]) != -1:
+        tmp = varproc(Eq(eq.children[0], "treeform"))
+        if tmp is not None:
+            n = int(eq.children[1].name[2:])+1
+            return Eq(eq.children[0], "treeform")**Eq("d_"+str(n), "strform")/(n*tmp)
+    if eq.name == "f_cos":
+        tmp = varproc(Eq(eq.children[0], "treeform"))
+        if tmp is not None:
+            return Eq(eq.children[0], "treeform").fx("sin")/tmp
+    if eq.name == "f_sin":
+        tmp = varproc(Eq(eq.children[0], "treeform"))
+        if tmp is not None:
+            return -1*Eq(eq.children[0], "treeform").fx("cos")/tmp
 def formula_1(eq):
     if eq.name == "f_pow" and abs(int(eq.children[1].name[2:])) == 2 and eq.children[0].name == "f_cos" and diffany2(Eq(eq.children[0].children[0], "treeform")).equation == "d_1":
         x = Eq(TreeNode("f_sin", [eq.children[0].children[0]]), "treeform")
@@ -632,18 +940,99 @@ def find_limit(equation,depth=3):
             if out is not None:
                 return out
     return None
+def return_only_var(eq):
+    output = []
+    def helper(eq):
+        nonlocal output
+        if eq.name[:2] == "v_" and eq.name[2:].isdigit():
+            output.append(eq.name)
+        for child in eq.children:
+            helper(child)
+    helper(eq)
+    output = list(set(output))
+    if len(output)!=1:
+        return None
+    return output[0]
+
+def const_mul(equation):
+    output = Eq("d_1", "strform")
+    
+    for item in equation.factor():
+        
+        if "v_" not in item.equation:
+            
+            output = output * item
+    return output
+
+def degree(eq, var):
+    
+    if any("f_" in x in eq.equation for x in "sin cos tan".split(" ")):
+        return 4
+    count = 0
+    while True:
+        if eq == Eq("0") or count==4:
+            break
+        eq = diffx(eq, var)
+        
+        count += 1
+    return count
+
+def quadratic(equation):
+    output = Eq("1")
+    def quad(eq):
+        
+        tmp= return_only_var(eq)
+        if tmp is not None:
+            a,b,c = Eq("0"), Eq("0"), Eq("0")
+            
+            if eq.name != "f_add":
+                eq = copy.deepcopy(TreeNode("f_add", [eq]))
+            if eq.name == "f_add":
+                for child in eq.children:
+                    
+                    cc = Eq(child, "treeform")
+                    if degree(cc, tmp) == 3:
+                        
+                        a = const_mul(cc)
+                    elif degree(cc, tmp) == 2:
+                        
+                        b = const_mul(cc)
+                    elif degree(cc, tmp) == 1:
+                        
+                        c = const_mul(cc)
+                    
+            tmp = Eq(tmp, "strform")
+            
+            if a != Eq("0"):
+                r1 = ( -b + (b**2 - 4*a*c)**Eq("1/2") )/(2*a)
+                r2 = ( -b - (b**2 - 4*a*c)**Eq("1/2") )/(2*a)
+                return (tmp-r1)*(tmp-r2)
+            else:
+                if b != Eq("0"):
+                    return tmp+c/b
+        return None
+    for item in equation.factor():
+        
+        tmp = quad(tree_form(item.equation))
+        if tmp is not None:
+            output = output * tmp
+        else:
+            output = output * item
+    return output
 
 equation = None
 while True:
     tmp = input(">>> ")
     try:
         orig = equation
-        if tmp == "factor":
-            for item in equation.factor():
-                print(item)
+        if tmp == "factor":   
+            equation = quadratic(equation)
+            print(equation)
         elif tmp == "expand":
-             #equation = Eq(flatten_tree(common(tree_form(equation.equation))), "treeform")
              equation = Eq(expand2(tree_form(equation.equation)), "treeform")
+             print(equation)
+        elif tmp == "simplify":
+             equation = Eq(simplify(tree_form(equation.equation)), "treeform")
              print(equation)
         elif tmp == "show":
             print(equation)
@@ -653,15 +1042,21 @@ while True:
             equation = Eq(formula_1(tree_form(equation.equation)), "treeform")
             print(equation)
         elif tmp == "d/dx":
-            print(diffx(equation))
+            equation = diffx(equation)
+            print(equation)
+        elif tmp == "Sdx":
+            tmp = integratex(equation)
+            if tmp is None:
+                print("failed to integrate")
+            else:
+                equation = tmp
+                print(equation)
         elif tmp == "limit 0":
             
             print("limit x->0 " + str(equation) + " = " + str(find_limit(equation)))
         else:
             equation = Eq(tmp,"stringequation")
             equation = Eq(replace_eq(tree_form(equation.equation)), "treeform")
-            
-            equation = take_common(equation)
             print(equation)
     except Exception as error:
         equation = orig
