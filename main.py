@@ -16,12 +16,12 @@ class Fraction2:
         elif isinstance(num, int):
             num = Fraction(num)
         elif isinstance(num, float):
-            num = Fraction.from_float(num)  # Correct float conversion
+            raise "error"
         elif isinstance(num, str):
             if "√" in num:
                 mode = "sqrt"
                 num = num.replace("√", "")
-            num = Fraction(num)  # Assuming valid fraction string
+            num = Fraction(num)
             
         if mode == "sqrt":
             self.num = num
@@ -44,7 +44,11 @@ class Fraction2:
         sgn2 = 1
         if self.num + other.num < 0:
             sgn2 = -1
-        return Fraction2(sgn2 * (abs(self.num) + abs(other.num) + sgn*n**Fraction(1,2)), "sqrt")
+        sgn2 = Fraction(sgn2)
+        n = Fraction(n)
+        n = Fraction(math.isqrt(n.numerator), math.isqrt(n.denominator))
+        
+        return Fraction2(sgn2 * (abs(self.num) + abs(other.num) + sgn*n), "sqrt")
     def sqrt(self):
         n = Fraction2(self.num, "sqrt").num
         if not isinstance(n, Fraction):
@@ -57,11 +61,18 @@ class Fraction2:
         return True
     @staticmethod
     def convert(term):
+        def ccc(term):
+            if not isinstance(term, Fraction):
+                return Fraction(term)
+            return term
         output = []
         for item in term:
             if not isinstance(item, Fraction2):
-                output.append(Fraction2(item))
+                x = Fraction2(item)
+                x.num = ccc(x.num) 
+                output.append(x)
             else:
+                item.num = ccc(item.num)
                 output.append(item)
         return output
     def __mul__(self, other):
@@ -73,18 +84,22 @@ class Fraction2:
     
     def __pow__(self, other):
         self, other = Fraction2.convert([self, other])
-        
         ans = Fraction2(self.num ** other.num, "sqrt")
         return ans
 
     def __truediv__(self, other):
+        self, other = Fraction2.convert([self, other])
         return Fraction2(self.num / other.num, "sqrt")
 
     def __radd__(self, other):
-        return self.__add__(Fraction2(other))
+        other = Fraction2(other)
+        self, other = Fraction2.convert([self, other])
+        return self.__add__(other)
 
     def __rmul__(self, other):
-        return self.__mul__(Fraction2(other))
+        other = Fraction2(other)
+        self, other = Fraction2.convert([self, other])
+        return self.__mul__(other)
     
     def __lt__(self, other):
         other = Fraction2(other) if not isinstance(other, Fraction2) else other
@@ -99,7 +114,7 @@ class Fraction2:
         return self.num > other.num
     def __ge__(self, other):
         if not isinstance(other, Fraction2):
-            other = Fraction2(other)  # Convert other to Fraction2 if necessary
+            other = Fraction2(other)
         return self.num >= other.num
     def __repr__(self):
         s = str(self.num)
@@ -135,8 +150,6 @@ def convert_sub2neg(eq):
         term = TreeNode(eq.name, [])
         for child in eq.children:
             term.children.append(a1(child))
-        if len(term.children)==1:
-            return term.children[0]
         return term
 
     def a2(eq):
@@ -147,8 +160,6 @@ def convert_sub2neg(eq):
         term = TreeNode(eq.name, [])
         for child in eq.children:
             term.children.append(a2(child))
-        if len(term.children)==1:
-            return term.children[0]
         return term
     eq = tree_form(eq)
     while "f_sub" in str_form(eq) or "f_div" in str_form(eq):
@@ -177,18 +188,18 @@ def calc(eq):
         b = calc(eq.children[1])
         if a is None or b is None:
             return None
+        a.num = Fraction(a.num)
+        b.num = Fraction(b.num)
         if b==Fraction2(Fraction(1,2)):
             if a.sqrt():
                 return a
             else:
                 return None
-        s = b.num
-        if not isinstance(s, Fraction):
-            s = Fraction(s)
-        if s.denominator == 1:
-            b.sqrt()
-            
-            return Fraction2(a.num**b.num, "sqrt")
+        b.sqrt()
+        try:
+            return Fraction2(Fraction(a.num)**Fraction(b.num), "sqrt")
+        except:
+            return None
         return None
     elif eq.name == "f_mul":
         p = 1
@@ -211,16 +222,16 @@ def calc(eq):
     return None
 
 def simple(eq):
-    global gg
     if (eq.name[:2] == "f_" and eq.name != "f_add") or eq.name[:2] in ["d_","v_"]:
         eq = copy.deepcopy(TreeNode("f_add", [eq]))
     
     if eq.name == "f_add":
         dic = {}
-        num3 = 0
+        num3 = Fraction(0)
         
         for i in range(len(eq.children)-1,-1,-1):
             tmp = calc(eq.children[i])
+            
             if tmp is not None:
                 num3 += tmp
                 eq.children.pop(i)
@@ -229,6 +240,7 @@ def simple(eq):
             if child.name == "f_mul":
                 for i in range(len(child.children)-1,-1,-1):
                     tmp = calc(child.children[i])
+                    
                     if tmp is not None:
                         num *= tmp
                         child.children.pop(i)
@@ -292,10 +304,10 @@ def simple(eq):
         return new
 
 def perfect_square_root(n):
-    try:
+    if n < 0:
+        root = -math.isqrt(-n)
+    else:
         root = math.isqrt(n)
-    except Exception as e:
-        return None
     return root if root * root == n else None
 
 def treesqrt(num): 
@@ -315,24 +327,27 @@ def frac(eq):
                 return treesqrt(n2.numerator)
             else:
                 return tree_form("d_"+str(s))
-        elif n2.numerator == 1:
+        elif abs(n2.numerator) == 1:
             b = None
-            s = perfect_square_root(n2.denominator)
+            s = perfect_square_root(n2.denominator*n2.numerator)
             if s is None:
-                b = treesqrt(n2.denominator)
+                b = treesqrt(n2.denominator*n2.numerator)
             else:
                 b = tree_form("d_"+str(s))
                 
-            b = TreeNode("f_pow", [b, tree_form("d_-1")])
+            b = copy.deepcopy(TreeNode("f_pow", [b, tree_form("d_-1")]))
+            
             return b
         else:
             b = None
+            
             s = perfect_square_root(n2.denominator)
             if s is None:
                 b = treesqrt(n2.denominator)
             else:
                 b = tree_form("d_"+str(s))
-
+            b = copy.deepcopy(TreeNode("f_pow", [b, tree_form("d_-1")]))
+            
             a = None
             a = perfect_square_root(n2.numerator)
             if s is None:
@@ -343,14 +358,11 @@ def frac(eq):
     return TreeNode(eq.name, [frac(child) for child in eq.children])
 
 def expand_eq(eq):
-    global gg
-    
-    
     eq = simple(eq)
     
-    gg = False
     if "√" in str_form(eq):
         eq = frac(eq)
+        
         eq = simplify(eq)
         eq = simplify(eq)
     
@@ -409,15 +421,17 @@ def common2(eq):
     eq = common(eq)
     return TreeNode(eq.name, [common2(child) for child in eq.children])
 def solve(eq):
+    #(sin(x)-tan(x))/x^3
     eq = convert_sub2neg(eq)
     eq = tree_form(eq)
     eq = expand_eq(eq)
+    
     eq = inversehandle(eq)
     eq = inversehandle(eq)
+    
     eq = flatten_tree(eq)
     eq = simplify(eq)
     eq = expand_eq(eq)
-    
     eq = simp(eq)
     
     return str_form(eq)
@@ -683,15 +697,23 @@ def expand2(eq):
         addchild = []
         for child in eq.children:
             ac += [tree_form(x.equation) for x in Eq(child, "treeform").factor()]
+        tmp3 = []
         for child in ac:
             tmp2 = []
-            if child.children != []:
-                for child2 in child.children:
-                    tmp2.append(Eq(child2, "treeform"))
+            if child.name == "f_add":
+                if child.children != []:
+                    for child2 in child.children:
+                        tmp2.append(Eq(child2, "treeform"))
+                else:
+                    tmp2 = [Eq(child, "treeform")]
             else:
-                tmp2 = [Eq(child, "treeform")]
+                tmp3.append(Eq(child, "treeform"))
             if tmp2 != []:
                 addchild.append(tmp2)
+        tmp4 = Eq("1")
+        for item in tmp3:
+            tmp4 = tmp4 * item
+        addchild.append([tmp4])
         def flatten(lst):
             flat_list = []
             for item in lst:
@@ -776,6 +798,7 @@ def diffx(equation, var="v_0"):
     
     equation = diffx2(equation, var)
     equation = Eq(equation, "treeform")
+    
     return equation
 def diffany2(equation):
     equation = diff(equation)
@@ -820,17 +843,26 @@ def approx(equation):
     return equation
 def subslimit(equation):
     equation = Eq(expand2(tree_form(equation.equation)), "treeform")
+
     equation = simplify(tree_form(equation.equation))
     if equation is None:
         return None
     equation = Eq(equation, "treeform")
+    
     equation = substitute_val(equation, 0)
+    
     equation = simplify(equation)
     equation = simplify(equation)
+    try:
+        equation = tree_form(solve(str_form(equation)))
+    except:
+        return None
+        
     if equation is None:
         return None
     return Eq(equation, "treeform")
-def lhostpital(equation):
+def lhospital(equation):
+    
     equation = simplify(tree_form(equation.equation))
     
     if equation is None:
@@ -839,12 +871,15 @@ def lhostpital(equation):
     e = substitute_val(equation, 0)
     e = simplify(e)
     e = simplify(e)
+    
     if e is None:
         n, d = numdem(equation)
         ans1 = subslimit(n)
         ans2 = subslimit(d)
+        
         if ans1 is not None and ans2 is not None and ans1 == Eq("0") and ans2 == Eq("0"):
-            equation = diffx(n)/diffx(d)
+            g, h = diffx(n), diffx(d)
+            equation = g/h
             return equation
         return None
     return None
@@ -855,7 +890,8 @@ def additionlimit(equation):
     equation = tree_form(equation.equation)
     if equation.name == "f_add":
         for child in equation.children:
-            tmp = find_limit(Eq(child, "treeform"))
+            tmp = find_limit(Eq(child, "treeform"), 3, True)
+            
             if tmp is not None:
                 final += tmp
             else:
@@ -922,7 +958,8 @@ def approx_limit(equation):
     if orig == equation:
         return None
     return equation
-def find_limit(equation,depth=3):
+def find_limit(equation,depth=3,tail=False):
+    
     ans = subslimit(equation)
     if ans is not None and "v_0" not in ans.equation:
         if "v_" in equation.equation.replace("v_0", ""):
@@ -933,11 +970,14 @@ def find_limit(equation,depth=3):
     if depth == 0:
         return None
     
-    for item in [lhostpital,additionlimit,approx_limit]:
+    for item in [lhospital,additionlimit,approx_limit]:
         ans = item(equation)
+        
         if ans is not None:
-            out = find_limit(ans, depth-1)
+            out = find_limit(ans, depth-1, tail)
+            
             if out is not None:
+                
                 return out
     return None
 def return_only_var(eq):
@@ -1053,7 +1093,7 @@ while True:
                 print(equation)
         elif tmp == "limit 0":
             
-            print("limit x->0 " + str(equation) + " = " + str(find_limit(equation)))
+            print("limit x->0 " + str(equation) + " = " + str(find_limit(equation, 3, False)))
         else:
             equation = Eq(tmp,"stringequation")
             equation = Eq(replace_eq(tree_form(equation.equation)), "treeform")
