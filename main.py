@@ -3,62 +3,71 @@ import copy
 import itertools
 from base import *
 from fractions import Fraction
+
+def perfect_square_root(n):
+    if n < 0:
+        root = -math.isqrt(-n)
+    else:
+        root = math.isqrt(n)
+    return root if root * root == abs(n) else None
+
+def pf(n):
+    if not isinstance(n, Fraction):
+        n = Fraction(n)
+    a = n.numerator
+    b = n.denominator
+    if perfect_square_root(a) is not None and perfect_square_root(b) is not None:
+        return Fraction(perfect_square_root(a),perfect_square_root(b))
+    return None
+
+def f2i(x):
+    if x.denominator == 1:
+        return x.numerator
+    return x
+
 def int2(string):
-    if "√" in string:
-        return math.isqrt(int(string.replace("√", "")))
-    return int(string)
+    tmp = Fraction2(string)
+    if tmp.b == 0:
+        return f2i(tmp.a)
+    return tmp
 class Fraction2:
-    def __init__(self, num, mode="nonsqrt"):
+    def __init__(self, a=Fraction(0,1), b=Fraction(0,1)):
         
-        if isinstance(num, Fraction2):
-            self.num = num.num
-            return
-        elif isinstance(num, int):
-            num = Fraction(num)
-        elif isinstance(num, float):
-            raise "error"
-        elif isinstance(num, str):
-            if "√" in num:
-                mode = "sqrt"
-                num = num.replace("√", "")
-            num = Fraction(num)
-            
-        if mode == "sqrt":
-            self.num = num
-        else:
-            if num == 0:
-                self.num = 0
-            else:
-                self.num = num * abs(num)
+        if isinstance(a, str):
+            if "," not in a:
+                self.a = Fraction(a)
+                self.b = 0
                 
+            else:
+                s = a.split(",")
+                a = Fraction(s[0])
+                b = Fraction(s[1])
+        if not isinstance(a, Fraction):
+            a = Fraction(a)
+        if not isinstance(b, Fraction):
+            b = Fraction(b)
+            
+        if b != Fraction(0) and pf(b) is not None:
+            a += pf(b)
+            b = 0
+        self.a = a
+        self.b = b
     def __neg__(self):
-        return Fraction2(-self.num, "sqrt")
+        self = Fraction2.convert([self])[0]
+        
+        return Fraction2(-self.a, -self.b)
     def __add__(self, other):
         self, other = Fraction2.convert([self, other])
-        
-        if self.num * other.num == 0:
-            sgn = 1
-        else:
-            sgn = self.num * other.num / abs(self.num * other.num)
-        n = 4 * abs(self.num * other.num)
-        sgn2 = 1
-        if self.num + other.num < 0:
-            sgn2 = -1
-        sgn2 = Fraction(sgn2)
-        n = Fraction(n)
-        n = Fraction(math.isqrt(n.numerator), math.isqrt(n.denominator))
-        
-        return Fraction2(sgn2 * (abs(self.num) + abs(other.num) + sgn*n), "sqrt")
-    def sqrt(self):
-        n = Fraction2(self.num, "sqrt").num
-        if not isinstance(n, Fraction):
-            n = Fraction(n)
-        a = perfect_square_root(n.numerator)
-        b = perfect_square_root(n.denominator)
-        if a is None or b is None:
-            return False
-        self.num = Fraction2(Fraction(a,b), "sqrt").num
-        return True
+        if self == Fraction2(0,0):
+            return other
+        elif other == Fraction2(0,0):
+            return self
+        if self.a == 0 and other.b == 0:
+            return Fraction2(other.a, self.b)
+        if self.b == 0 and other.a == 0:
+            return Fraction2(self.a, other.b)
+        return Fraction2(self.a+other.a+abs(self.b)+abs(other.b), 4*self.b*other.b)
+    
     @staticmethod
     def convert(term):
         def ccc(term):
@@ -69,27 +78,29 @@ class Fraction2:
         for item in term:
             if not isinstance(item, Fraction2):
                 x = Fraction2(item)
-                x.num = ccc(x.num) 
+                x.a = ccc(x.a)
+                x.b = ccc(x.b)
                 output.append(x)
             else:
-                item.num = ccc(item.num)
+                item.a = ccc(item.a)
+                item.b = ccc(item.b)
                 output.append(item)
         return output
     def __mul__(self, other):
         self, other = Fraction2.convert([self, other])
-        ans = Fraction2(self.num * other.num, "sqrt")
-        return ans
+        return Fraction2(self.a*other.a)+Fraction2(0,other.a*abs(other.a) * self.b)+Fraction2(0,self.a*abs(self.a) * other.b)+Fraction2(0,self.b*other.b)
+
     def __abs__(self):
-        return Fraction2(abs(self.num), "sqrt")
-    
-    def __pow__(self, other):
-        self, other = Fraction2.convert([self, other])
-        ans = Fraction2(self.num ** other.num, "sqrt")
-        return ans
+        self = Fraction2.convert([self])[0]
+        return Fraction2(abs(self.a), abs(self.b))
 
     def __truediv__(self, other):
         self, other = Fraction2.convert([self, other])
-        return Fraction2(self.num / other.num, "sqrt")
+        x = Fraction2(self.a, self.b)*Fraction2(other.a, other.b)
+        y = other.a ** 2 + other.b
+        x.a = x.a/y
+        x.b = x.b/y
+        return x
 
     def __radd__(self, other):
         other = Fraction2(other)
@@ -100,30 +111,30 @@ class Fraction2:
         other = Fraction2(other)
         self, other = Fraction2.convert([self, other])
         return self.__mul__(other)
-    
+    def compute(self):
+        return float(self.a) + math.sqrt(float(self.b))
     def __lt__(self, other):
         other = Fraction2(other) if not isinstance(other, Fraction2) else other
-        return self.num < other.num
+        return self.compute() < other.compute()
     
     def __eq__(self, other):
         other = Fraction2(other) if not isinstance(other, Fraction2) else other
-        return self.num == other.num
+        return self.a == other.a and self.b == other.b
 
     def __gt__(self, other):
         other = Fraction2(other) if not isinstance(other, Fraction2) else other
-        return self.num > other.num
+        return self.compute() > other.compute()
     def __ge__(self, other):
         if not isinstance(other, Fraction2):
             other = Fraction2(other)
-        return self.num >= other.num
+        return self.compute() >= other.compute()
     def __repr__(self):
-        s = str(self.num)
-        if "√" not in s:
-            if "-" in s:
-                s = "-√"+s[1:]
-            else:
-                s = "√"+s
-        return s
+        return str(self.a)+","+str(self.b)
+    def sqrt(self):
+        self = Fraction2.convert([self])[0]
+        if self.b == 0:
+            return Fraction2(0,self.a)
+        return Fraction2(self.a+self.b, 4*self.a*self.b)
 def flatten_tree(node):
     if not node.children:
         return node
@@ -180,7 +191,6 @@ def is_str_n(s, eq=None):
         return None
     return False
 def calc(eq):
-    
     if eq.name[:2] == "d_":
         return Fraction2(eq.name[2:])
     elif eq.name == "f_pow":
@@ -188,18 +198,12 @@ def calc(eq):
         b = calc(eq.children[1])
         if a is None or b is None:
             return None
-        a.num = Fraction(a.num)
-        b.num = Fraction(b.num)
         if b==Fraction2(Fraction(1,2)):
-            if a.sqrt():
-                return a
-            else:
+            if a.a == 0:
                 return None
-        b.sqrt()
-        try:
-            return Fraction2(Fraction(a.num)**Fraction(b.num), "sqrt")
-        except:
-            return None
+            return a.sqrt()
+        if b==Fraction2(Fraction(-1,1)):
+            return Fraction2(1,0)/a
         return None
     elif eq.name == "f_mul":
         p = 1
@@ -213,8 +217,11 @@ def calc(eq):
     elif eq.name == "f_add":
         p = 0
         for child in eq.children:
+            
             tmp  = calc(child)
+            
             if tmp is not None:
+                
                 p += tmp
             else:
                 return None
@@ -231,19 +238,20 @@ def simple(eq):
         
         for i in range(len(eq.children)-1,-1,-1):
             tmp = calc(eq.children[i])
+            if tmp is None:
+                continue
+            num3 += tmp
+            eq.children.pop(i)
             
-            if tmp is not None:
-                num3 += tmp
-                eq.children.pop(i)
         for child in eq.children:
             num = 1
             if child.name == "f_mul":
                 for i in range(len(child.children)-1,-1,-1):
                     tmp = calc(child.children[i])
-                    
-                    if tmp is not None:
-                        num *= tmp
-                        child.children.pop(i)
+                    if tmp is None:
+                        continue
+                    num *= tmp
+                    child.children.pop(i)
                 dic2 = {}
                 for i in range(len(child.children)-1,-1,-1):
                     num2 = 1
@@ -303,13 +311,6 @@ def simple(eq):
             new.children[i] = simple(copy.deepcopy(new.children[i]))
         return new
 
-def perfect_square_root(n):
-    if n < 0:
-        root = -math.isqrt(-n)
-    else:
-        root = math.isqrt(n)
-    return root if root * root == n else None
-
 def treesqrt(num): 
     b = TreeNode("f_pow", [tree_form("d_"+str(abs(num))), TreeNode("f_pow", [tree_form("d_2"), tree_form("d_-1")] ) ] )
     if num < 0:
@@ -318,9 +319,12 @@ def treesqrt(num):
 def frac(eq):
     if eq.name[:2] == "d_":
         n = Fraction2(eq.name[2:])
-        n2 = n.num
+        n2 = n.b
+        
         if not isinstance(n2, Fraction):
             n2 = Fraction(n2)
+        if n2 == 0:
+            return tree_form("d_0")
         if n2.denominator == 1:
             s = perfect_square_root(n2.numerator)
             if s is None:
@@ -356,14 +360,40 @@ def frac(eq):
                 a = tree_form("d_"+str(s))
                 
             return TreeNode("f_mul", [a,b])
-    return TreeNode(eq.name, [frac(child) for child in eq.children])
-
+def frac3(n):
+    if n.denominator == 1:
+        return tree_form("d_"+str(n.numerator))
+    elif abs(n.numerator) == 1:
+        b = tree_form("d_"+str(n.denominator*n.numerator))
+        return TreeNode("f_pow", [b, tree_form("d_-1")])
+    else:
+        a = tree_form("d_"+str(n.numerator))
+        b = tree_form("d_"+str(n.denominator))
+        return TreeNode("f_mul", [a,b])
+def frac2(eq):
+    if eq.name[:2] == "d_":
+        n= Fraction2(eq.name[2:])
+        
+        if n.a == 0:
+            return frac(eq)
+        else:
+            x = frac(eq)
+            y = frac3(Fraction(eq.name[2:].split(",")[0]))
+            if x.name == "d_0":
+                return y
+            elif y.name == "d_0":
+                return x
+            return TreeNode("f_add", [x, y])
+    
+    return TreeNode(eq.name, [frac2(child) for child in eq.children])
 def expand_eq(eq):
     eq = simple(eq)
     eq = simple(eq)
-    if "√" in str_form(eq):
-        eq = frac(eq)
+    if "," in str_form(eq):
+        eq = frac2(eq)
+        
         eq = simplify(eq)
+        
         eq = simplify(eq)
     
     return eq
@@ -743,6 +773,7 @@ def expand2(eq):
             for item in itertools.product(*addchild):
                 mul = Eq("1")
                 for item2 in item:
+                    
                     mul = mul * item2
                 add = add + mul
             eq = tree_form(add.equation)
@@ -1126,7 +1157,6 @@ while True:
             equation = Eq(tmp,"stringequation")
             
             print(equation)
-            
     except Exception as error:
         equation = orig
         print(error)
