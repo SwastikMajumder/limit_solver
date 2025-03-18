@@ -42,7 +42,7 @@ def string_equation_helper(equation_tree):
     s = "(" # bracket
     if len(equation_tree.children) == 1:
         s = equation_tree.name[2:] + s
-    sign = {"f_sub":"-", "f_neg":"?", "f_inv":"?", "f_add": "+", "f_mul": "*", "f_pow": "^", "f_poly": ",", "f_div": "/", "f_int": ",", "f_sub": "-", "f_dif": "?", "f_sin": "?", "f_cos": "?", "f_tan": "?", "f_eq": "=", "f_sqt": "?"} # operation symbols
+    sign = {"f_abs":"?", "f_log":"?", "f_sub":"-", "f_neg":"?", "f_inv":"?", "f_add": "+", "f_mul": "*", "f_pow": "^", "f_poly": ",", "f_div": "/", "f_int": ",", "f_sub": "-", "f_dif": "?", "f_sin": "?", "f_cos": "?", "f_tan": "?", "f_eq": "=", "f_sqt": "?"} # operation symbols
     for child in equation_tree.children:
         s+= string_equation_helper(copy.deepcopy(child)) + sign[equation_tree.name]
     s = s[:-1] + ")"
