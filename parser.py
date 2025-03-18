@@ -59,7 +59,7 @@ grammar = """
      | VARIABLE          -> variable
      | "(" expr ")"      -> paren
 
-FUNC_NAME: "sin" | "cos" | "tan" | "log" | "sqrt" | "int" | "dif"
+FUNC_NAME: "sin" | "cos" | "tan" | "log" | "sqrt" | "int" | "dif" | "abs"
 VARIABLE: "x" | "y" | "z" | "A" | "B" | "C"
 
 %import common.NUMBER
@@ -103,7 +103,7 @@ def take_input(equation):
   tree_node = remove_past(tree_node)
   
   def fxchange(tree_node):
-    return TreeNode("f_"+tree_node.name if tree_node.name in ["sub", "neg", "inv", "add", "sin", "cos", "tan", "mul", "int", "dif", "pow", "div"]\
+    return TreeNode("f_"+tree_node.name if tree_node.name in ["sub", "neg", "inv", "add", "sin", "cos", "tan", "mul", "int", "dif", "pow", "div", "log", "abs"]\
                     else "d_"+tree_node.name, [fxchange(child) for child in tree_node.children])
   tree_node = fxchange(tree_node)
   
