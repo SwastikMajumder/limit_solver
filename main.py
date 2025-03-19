@@ -276,7 +276,7 @@ def common(eq):
             if len(c.children)==1:
                 c = c.children[0]
             c = TreeNode("f_pow", [c, tree_form("d_-1")])
-            return TreeNode("f_mul", [a,c])
+            return TreeNode("f_mul", [expand2(a),c])
     arr = TreeNode(eq.name, [])
     for child in eq.children:
         arr.children.append(common(child))
@@ -709,13 +709,12 @@ def diffany(equation):
             return Eq("1")
     return Eq(TreeNode(eq.name, [tree_form(diffany(Eq(child, "treeform")).equation) for child in eq.children]), "treeform")
 def diffx(equation, var="v_0"):
-    
     equation = diff(equation)
     
     equation = tree_form(equation.equation)
+    
     equation = diffx2(equation, var)
     equation = Eq(equation, "treeform")
-    
     return equation
 def diffany2(equation):
     equation = diff(equation)
@@ -904,6 +903,18 @@ def integratex(equation, var="v_0"):
             if item[0] + item[1] == item[2]:
                 h = item[2].fx("tan")-item[1].fx("tan")-item[0].fx("tan")
                 return integratex(Eq(replace_eq2(tree_form(h.equation)), "treeform"), var)
+    tmp3 = structure(eq, tree_form('f_mul\n u_0\n f_pow\n  f_add\n   u_1\n   f_pow\n    u_2\n    u_3\n  f_mul\n   u_4\n   f_pow\n    u_5\n    d_-1'))
+    if tmp3 is not None:
+        tmp = [Eq(tmp3[x], "strform") for x in sorted(tmp3.keys(), key=lambda x: x)]
+        if tmp[5] == tmp[3]:
+            return integratex(tmp[2]**tmp[4]*tmp[0]*(tmp[1]+tmp[2]**(-tmp[3]))**(tmp[4]/tmp[3]), var)
+    '''
+    tmp3 = structure(eq, tree_form('f_mul\n f_pow\n  u_0\n  f_mul\n   u_1\n   f_pow\n    u_2\n    d_-1\n f_pow\n  u_3\n  f_mul\n   u_4\n   f_pow\n    u_2\n    d_-1'))
+    if tmp3 is not None:
+        tmp = [Eq(tmp3[x], "strform") for x in sorted(tmp3.keys(), key=lambda x: x)]
+        eq2 = ((tmp[0]/tmp[3])**tmp[1] * tmp[3]**(tmp[1]+tmp[4]))**(Eq("1")/tmp[2])
+        return integratex(eq2, var)
+    '''
     if var == "v_0":
         x = Eq("y")-Eq(collect(eq), "strform")
         
@@ -1047,7 +1058,6 @@ def inverse2(eq, var="v_0"):
     tmp = inverse(eq, tree_form(var))
     return tmp
 
-
 def subs1(equation, term):
     eq = tree_form(equation.equation)
     termeq = tree_form(term.equation)
@@ -1057,12 +1067,12 @@ def subs1(equation, term):
     eq = replace2(eq, tree_form("v_0"), t)
     
     eq2 = replace2(tree_form(diffx(inverse2(copy.deepcopy(termeq), "v_1")).equation), tree_form("v_0"), t)
-    
     equation = Eq(eq, "treeform")/Eq(eq2, "treeform")
     
     equation = Eq(replace_eq(tree_form(equation.equation)), "treeform")
     equation = Eq(expand2(tree_form(equation.equation)), "treeform")
-
+    
+    
     tmp = integratex(equation, "v_1")
     
     if tmp is None:
@@ -1086,8 +1096,7 @@ def a2x2(eq):
                 return t.fx("abs").fx("log") / (2*const)
             equation = orig
     return None
-       
-            
+   
 def quadratic(equation):
     output = None
     def quad(eq):
@@ -1113,7 +1122,8 @@ def quadratic(equation):
                         c = const_mul(cc)
                     
             tmp = Eq(tmp, "strform")
-            
+            if "v_" in a.equation or "v_" in b.equation or "v_" in c.equation:
+                return None
             if a != Eq("0"):
                 d = b**2 - 4*a*c
                 if tree_form(d.equation).name[:2] == "d_":
@@ -1127,12 +1137,14 @@ def quadratic(equation):
                 return (tmp-r1)*(tmp-r2)
             else:
                 if b != Eq("0"):
-                    return tmp+c/b
+                    return tmp+c/b, b
         return None
 
     if equation.name == "f_add":
         tmp = quad(copy.deepcopy(equation))
         if tmp is not None:
+            if not isinstance(tmp, Eq):
+                tmp = tmp[0] * tmp[1]
             return tree_form(tmp.equation)
     
     return TreeNode(equation.name, [quadratic(child) for child in equation.children])
