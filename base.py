@@ -1,5 +1,4 @@
 import copy
-
 class TreeNode:
     def __init__(self, name, children=None):
         self.name = name
@@ -39,7 +38,7 @@ def str_form(node):
 def string_equation_helper(equation_tree):
     if equation_tree.children == []:
         return equation_tree.name
-    s = "(" # bracket
+    s = "(" 
     if len(equation_tree.children) == 1:
         s = equation_tree.name[2:] + s
     sign = {"f_abs":"?", "f_log":"?", "f_sub":"-", "f_neg":"?", "f_inv":"?", "f_add": "+", "f_mul": "*", "f_pow": "^", "f_poly": ",", "f_div": "/", "f_int": ",", "f_sub": "-", "f_dif": "?", "f_sin": "?", "f_cos": "?", "f_tan": "?", "f_eq": "=", "f_sqt": "?"} # operation symbols
@@ -54,5 +53,4 @@ def string_equation(eq):
     eq = eq.replace("d_", "")
     eq = eq.replace("v_", "")
     eq = eq.replace("'", "")
-    
     return string_equation_helper(tree_form(eq))
