@@ -1134,7 +1134,7 @@ def quadratic(equation):
                     return None
                 r1 = ( -b + (b**2 - 4*a*c)**Eq("1/2") )/(2*a)
                 r2 = ( -b - (b**2 - 4*a*c)**Eq("1/2") )/(2*a)
-                return (tmp-r1)*(tmp-r2)
+                return (tmp-r1)*(tmp-r2), a
             else:
                 if b != Eq("0"):
                     return tmp+c/b, b
@@ -1196,3 +1196,4 @@ while True:
     except Exception as error:
         equation = orig
         print(error)
+    
