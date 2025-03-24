@@ -32,28 +32,57 @@ def extract_nested_lists(s, n=0):
     return nested_lists, s
 grammar = """
 ?start: expr
-?expr: term
-     | expr "+" term   -> add
-     | expr "-" term   -> sub
+?expr: logic_or
+
+?logic_or: logic_and
+         | logic_or "|" logic_and  -> or
+
+?logic_and: equality
+          | logic_and "&" equality  -> and
+
+?equality: arithmetic
+         | equality "=" arithmetic  -> eq
+
+?arithmetic: term
+           | arithmetic "+" term   -> add
+           | arithmetic "-" term   -> sub
+
 ?term: factor
      | term "*" factor  -> mul
      | term "/" factor  -> div
-?factor: base
-       | factor "^" base  -> pow
+
+?factor: not_expr
+       | factor "^" not_expr  -> pow
+
+?not_expr: "!" not_expr  -> not
+         | "-" not_expr  -> neg   // Handles negative numbers and expressions
+         | base
+
 ?base: NUMBER            -> number
      | FUNC_NAME "(" expr ")" -> func
      | VARIABLE          -> variable
      | "(" expr ")"      -> paren
-FUNC_NAME: "sin" | "cos" | "tan" | "log" | "sqrt" | "int" | "dif" | "abs"
-VARIABLE: "x" | "y" | "z" | "A" | "B" | "C"
+
+FUNC_NAME: "sin" | "circumcenter" | "cos" | "tan" | "log" | "sqrt" | "int" | "dif" | "abs" | "transpose" | "exp" | "cosec" | "sec" | "cot"
+
+VARIABLE: "x" | "y" | "z" | "A" | "B" | "C" | "D" | "a" | "b" | "c" | "d" | "e" | "f"
+
 %import common.NUMBER
 %import common.WS_INLINE
 %ignore WS_INLINE
 """
+
+
 parser = Lark(grammar, start='start', parser='lalr')
 def take_input(equation):
   equation = equation.replace(" ", "")
   mdata, equation = extract_nested_lists(equation)
+  def conv_list(eq):
+    if isinstance(eq, list):
+        return TreeNode("f_list", [conv_list(child) for child in eq])
+    else:
+        return tree_form(take_input(eq))
+  mdata = [conv_list(element) for element in mdata]
   parse_tree = parser.parse(equation)
   def convert_to_treenode(parse_tree):
       def tree_to_treenode(tree):
@@ -81,12 +110,14 @@ def take_input(equation):
   tree_node = convert_to_treenode(parse_tree)
   tree_node = remove_past(tree_node)
   def fxchange(tree_node):
-    return TreeNode("f_"+tree_node.name if tree_node.name in ["sub", "neg", "inv", "add", "sin", "cos", "tan", "mul", "int", "dif", "pow", "div", "log", "abs"]\
+    return TreeNode("f_"+tree_node.name if tree_node.name in ["cosec", "sec", "cot", "or", "not", "and", "exp", "circumcenter", "transpose", "eq", "sub", "neg", "inv", "add", "sin", "cos", "tan", "mul", "int", "dif", "pow", "div", "log", "abs"]\
                     else "d_"+tree_node.name, [fxchange(child) for child in tree_node.children])
   tree_node = fxchange(tree_node)
-  for i in range(3):
-    tree_node = replace(tree_node, tree_form("d_"+["x", "y", "z"][i]), tree_form("v_"+str(i)))
+  for i in range(26):
+    alpha = ["x", "y", "z"]+[chr(x+ord("a")) for x in range(0,23)]
+    tree_node = replace(tree_node, tree_form("d_"+alpha[i]), tree_form("v_"+str(i)))
   for i in range(len(mdata)):
-    tree_node = replace(tree_node, tree_form("d_"+chr(i+ord("A"))), tree_form("v_"+str(mdata[i]).replace(" ", "")))
+    tree_node = replace(tree_node, tree_form("d_"+chr(i+ord("A"))), mdata[i])
   tree_node = str_form(tree_node)
+  
   return tree_node

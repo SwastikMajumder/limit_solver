@@ -3,8 +3,26 @@ class TreeNode:
     def __init__(self, name, children=None):
         self.name = name
         self.children = children or []
+    def fx(self, fxname):
+        return TreeNode("f_"+fxname, [copy.deepcopy(self)])
     def __repr__(self):
         return string_equation(str_form(self))
+    def __eq__(self, other):
+        return str_form(self)==str_form(other)
+    def __add__(self, other):
+        return TreeNode("f_add", copy.deepcopy([self, other]))
+    def __mul__(self, other):
+        return TreeNode("f_mul", copy.deepcopy([self, other]))
+    def __sub__(self, other):
+        return self + other * tree_form("d_-1")
+    def __pow__(self, other):
+        return TreeNode("f_pow", copy.deepcopy([self, other]))
+    def __truediv__(self, other):
+        return self * other ** tree_form("d_-1")
+    def __and__(self, other):
+        return TreeNode("f_and", copy.deepcopy([self, other]))
+    def __or__(self, other):
+        return TreeNode("f_or", copy.deepcopy([self, other]))
 def replace(equation, find, r):
   if str_form(equation) == str_form(find):
     return r
@@ -38,18 +56,20 @@ def str_form(node):
 def string_equation_helper(equation_tree):
     if equation_tree.children == []:
         return equation_tree.name
+    if equation_tree.name == "f_list":
+        return "["+",".join([string_equation_helper(child) for child in equation_tree.children])+"]"
     s = "(" 
     if len(equation_tree.children) == 1:
         s = equation_tree.name[2:] + s
-    sign = {"f_abs":"?", "f_log":"?", "f_sub":"-", "f_neg":"?", "f_inv":"?", "f_add": "+", "f_mul": "*", "f_pow": "^", "f_poly": ",", "f_div": "/", "f_int": ",", "f_sub": "-", "f_dif": "?", "f_sin": "?", "f_cos": "?", "f_tan": "?", "f_eq": "=", "f_sqt": "?"} # operation symbols
+    sign = {"cosec":"?" , "sec":"?", "cot": "?", "f_circumcenter":"?", "f_transpose":"?", "f_exp":"?", "f_abs":"?", "f_log":"?", "f_and":"&", "f_or":"|", "f_sub":"-", "f_neg":"?", "f_inv":"?", "f_add": "+", "f_mul": "*", "f_pow": "^", "f_poly": ",", "f_div": "/", "f_int": ",", "f_sub": "-", "f_dif": "?", "f_sin": "?", "f_cos": "?", "f_tan": "?", "f_eq": "=", "f_sqt": "?"}
     for child in equation_tree.children:
         s+= string_equation_helper(copy.deepcopy(child)) + sign[equation_tree.name]
     s = s[:-1] + ")"
     return s
 def string_equation(eq):
-    eq = eq.replace("v_0", "x")
-    eq = eq.replace("v_1", "y")
-    eq = eq.replace("v_2", "z")
+    alpha = ["x", "y", "z"]+[chr(x+ord("a")) for x in range(0,23)]
+    for i, letter in enumerate(alpha):
+        eq = eq.replace("v_"+str(i), letter)
     eq = eq.replace("d_", "")
     eq = eq.replace("v_", "")
     eq = eq.replace("'", "")
