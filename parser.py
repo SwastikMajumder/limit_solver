@@ -30,6 +30,7 @@ def extract_nested_lists(s, n=0):
     for idx, (start, end) in enumerate(reversed(indices)):
         s = s[:start] + f'{chr(len(indices)-idx-1+ord("A")+n)}' + s[end:]
     return nested_lists, s
+
 grammar = """
 ?start: expr
 ?expr: logic_or
@@ -55,17 +56,18 @@ grammar = """
        | factor "^" not_expr  -> pow
 
 ?not_expr: "!" not_expr  -> not
-         | "-" not_expr  -> neg   // Handles negative numbers and expressions
+         | "-" not_expr  -> neg
          | base
 
-?base: NUMBER            -> number
-     | FUNC_NAME "(" expr ")" -> func
-     | VARIABLE          -> variable
-     | "(" expr ")"      -> paren
+?base: NUMBER              -> number
+     | FUNC_NAME "(" [expr ("," expr)*] ")" -> func
+     | VARIABLE            -> variable
+     | "[" [expr ("," expr)*] "]" -> list
+     | "(" expr ")"        -> paren
 
-FUNC_NAME: "sin" | "circumcenter" | "cos" | "tan" | "log" | "sqrt" | "int" | "dif" | "abs" | "transpose" | "exp" | "cosec" | "sec" | "cot"
+FUNC_NAME: "sin" | "circumcenter" | "cos" | "tan" | "log" | "sqrt" | "integrate" | "dif" | "abs" | "transpose" | "cosec" | "sec" | "cot" | "arctan"
 
-VARIABLE: "x" | "y" | "z" | "A" | "B" | "C" | "D" | "a" | "b" | "c" | "d" | "e" | "f"
+VARIABLE: "x" | "y" | "z" | "A" | "B" | "C" | "D" | "a" | "b" | "c" | "d" | "f" | "g" | "i" | "n" | "e"
 
 %import common.NUMBER
 %import common.WS_INLINE
@@ -73,17 +75,19 @@ VARIABLE: "x" | "y" | "z" | "A" | "B" | "C" | "D" | "a" | "b" | "c" | "d" | "e" 
 """
 
 
-parser = Lark(grammar, start='start', parser='lalr')
-def take_input(equation):
-  equation = equation.replace(" ", "")
-  mdata, equation = extract_nested_lists(equation)
-  def conv_list(eq):
-    if isinstance(eq, list):
-        return TreeNode("f_list", [conv_list(child) for child in eq])
-    else:
-        return tree_form(take_input(eq))
-  mdata = [conv_list(element) for element in mdata]
-  parse_tree = parser.parse(equation)
+def take_input(equation, funclist=None):
+  global grammar
+  equation = copy.copy(equation.replace(" ", ""))
+  grammar2 = copy.deepcopy(grammar)
+  if funclist is not None:
+      output = grammar2.split("\n")
+      for i in range(len(output)):
+          if "FUNC_NAME:" in output[i]:
+              output[i] = output[i].replace("FUNC_NAME: ", "FUNC_NAME: " + " | ".join(['"' + x + '"' for x in funclist]) + " | ")
+      grammar2 = "\n".join(output)
+  parser_main = Lark(grammar2, start='start', parser='lalr')
+  
+  parse_tree = parser_main.parse(equation)
   def convert_to_treenode(parse_tree):
       def tree_to_treenode(tree):
           if isinstance(tree, Tree):
@@ -110,14 +114,16 @@ def take_input(equation):
   tree_node = convert_to_treenode(parse_tree)
   tree_node = remove_past(tree_node)
   def fxchange(tree_node):
-    return TreeNode("f_"+tree_node.name if tree_node.name in ["cosec", "sec", "cot", "or", "not", "and", "exp", "circumcenter", "transpose", "eq", "sub", "neg", "inv", "add", "sin", "cos", "tan", "mul", "int", "dif", "pow", "div", "log", "abs"]\
+    nonlocal funclist
+    tmp3 = []
+    if funclist is not None:
+        tmp3 = funclist
+    return TreeNode("f_"+tree_node.name if tree_node.name in tmp3+["arctan", "list", "cosec", "sec", "cot", "or", "not", "and", "circumcenter", "transpose", "eq", "sub", "neg", "inv", "add", "sin", "cos", "tan", "mul", "integrate", "dif", "pow", "div", "log", "abs"]\
                     else "d_"+tree_node.name, [fxchange(child) for child in tree_node.children])
   tree_node = fxchange(tree_node)
+  tree_node = replace(tree_node, tree_form("d_e"), tree_form("s_e"))
   for i in range(26):
     alpha = ["x", "y", "z"]+[chr(x+ord("a")) for x in range(0,23)]
     tree_node = replace(tree_node, tree_form("d_"+alpha[i]), tree_form("v_"+str(i)))
-  for i in range(len(mdata)):
-    tree_node = replace(tree_node, tree_form("d_"+chr(i+ord("A"))), mdata[i])
-  tree_node = str_form(tree_node)
   
   return tree_node
