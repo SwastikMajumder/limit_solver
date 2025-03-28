@@ -65,7 +65,7 @@ grammar = """
      | "[" [expr ("," expr)*] "]" -> list
      | "(" expr ")"        -> paren
 
-FUNC_NAME: "sin" | "circumcenter" | "cos" | "tan" | "log" | "sqrt" | "integrate" | "dif" | "abs" | "transpose" | "cosec" | "sec" | "cot" | "arctan"
+FUNC_NAME: "sin" | "circumcenter" | "cos" | "tan" | "log" | "sqrt" | "integrate" | "dif" | "abs" | "transpose" | "cosec" | "sec" | "cot" | "arctan" | "arcsin" | "arccos"
 
 VARIABLE: "x" | "y" | "z" | "A" | "B" | "C" | "D" | "a" | "b" | "c" | "d" | "f" | "g" | "i" | "n" | "e"
 
@@ -118,7 +118,7 @@ def take_input(equation, funclist=None):
     tmp3 = []
     if funclist is not None:
         tmp3 = funclist
-    return TreeNode("f_"+tree_node.name if tree_node.name in tmp3+["arctan", "list", "cosec", "sec", "cot", "or", "not", "and", "circumcenter", "transpose", "eq", "sub", "neg", "inv", "add", "sin", "cos", "tan", "mul", "integrate", "dif", "pow", "div", "log", "abs"]\
+    return TreeNode("f_"+tree_node.name if tree_node.name in tmp3+["arcsin", "arccos", "arctan", "list", "cosec", "sec", "cot", "or", "not", "and", "circumcenter", "transpose", "eq", "sub", "neg", "inv", "add", "sin", "cos", "tan", "mul", "integrate", "dif", "pow", "div", "log", "abs"]\
                     else "d_"+tree_node.name, [fxchange(child) for child in tree_node.children])
   tree_node = fxchange(tree_node)
   tree_node = replace(tree_node, tree_form("d_e"), tree_form("s_e"))
