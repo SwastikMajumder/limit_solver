@@ -23,6 +23,15 @@ class TreeNode:
         return TreeNode("f_and", [self,other])
     def __or__(self, other):
         return TreeNode("f_or", [self,other])
+    def __hash__(self):
+        return hash(str_form(self))
+def str_form(node):
+    def recursive_str(node, depth=0):
+        result = "{}{}".format(' ' * depth, node.name)
+        for child in node.children:
+            result += "\n" + recursive_str(child, depth + 1)
+        return result
+    return recursive_str(node)
 def replace(equation, find, r):
   if str_form(equation) == str_form(find):
     return r
@@ -46,13 +55,6 @@ def tree_form(tabbed_strings):
         current_level_nodes[level] = node
         stack.append(node)
     return root.children[0]
-def str_form(node):
-    def recursive_str(node, depth=0):
-        result = "{}{}".format(' ' * depth, node.name)
-        for child in node.children:
-            result += "\n" + recursive_str(child, depth + 1)
-        return result
-    return recursive_str(node)
 def string_equation_helper(equation_tree):
     if equation_tree.children == []:
         return equation_tree.name
@@ -61,26 +63,24 @@ def string_equation_helper(equation_tree):
     s = "(" 
     if len(equation_tree.children) == 1 or equation_tree.name in ["f_integrate"]:
         s = equation_tree.name[2:] + s
-    sign = {"f_cosec":"?" , "f_sec":"?", "f_cot": "?", "f_circumcenter":"?", "f_transpose":"?", "f_exp":"?", "f_abs":"?", "f_log":"?", "f_and":"&", "f_or":"|", "f_sub":"-", "f_neg":"?", "f_inv":"?", "f_add": "+", "f_mul": "*", "f_pow": "^", "f_poly": ",", "f_div": "/", "f_int": ",", "f_sub": "-", "f_dif": "?", "f_sin": "?", "f_cos": "?", "f_tan": "?", "f_eq": "=", "f_sqt": "?"}
+    sign = {"f_cosec":"?" , "f_equiv": "<->", "f_sec":"?", "f_cot": "?", "f_circumcenter":"?", "f_transpose":"?", "f_exp":"?", "f_abs":"?", "f_log":"?", "f_and":"&", "f_or":"|", "f_sub":"-", "f_neg":"?", "f_inv":"?", "f_add": "+", "f_mul": "*", "f_pow": "^", "f_poly": ",", "f_div": "/", "f_int": ",", "f_sub": "-", "f_dif": "?", "f_sin": "?", "f_cos": "?", "f_tan": "?", "f_eq": "=", "f_sqt": "?"}
+    arr = []
+    k = None
+    if equation_tree.name not in sign.keys():
+        k = ","
+    else:
+        k = sign[equation_tree.name]
     for child in equation_tree.children:
-        k = None
-        if equation_tree.name not in sign.keys():
-            k = ","
-        else:
-            k = sign[equation_tree.name]
-        s+= string_equation_helper(copy.deepcopy(child)) + k
-    s = s[:-1] + ")"
-    return s
+        arr.append(string_equation_helper(copy.deepcopy(child)))
+    return s + k.join(arr) + ")"
 def string_equation(eq):
-    
     alpha = ["x", "y", "z"]+[chr(x+ord("a")) for x in range(0,23)]
     eq = tree_form(eq)
-    
     for i, letter in enumerate(alpha):
         eq = replace(eq, tree_form("v_"+str(i)), tree_form(letter))
     eq = str_form(eq)
     eq = eq.replace("d_", "")
     eq = eq.replace("s_", "")
+    eq = eq.replace("v_", "")
     eq = eq.replace("'", "")
-    
     return string_equation_helper(tree_form(eq))

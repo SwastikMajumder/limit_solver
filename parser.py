@@ -30,51 +30,39 @@ def extract_nested_lists(s, n=0):
     for idx, (start, end) in enumerate(reversed(indices)):
         s = s[:start] + f'{chr(len(indices)-idx-1+ord("A")+n)}' + s[end:]
     return nested_lists, s
-
 grammar = """
 ?start: expr
-?expr: logic_or
-
+?expr: logic_equiv
+?logic_equiv: logic_or
+            | logic_equiv "<->" logic_or  -> equiv
 ?logic_or: logic_and
          | logic_or "|" logic_and  -> or
-
 ?logic_and: equality
           | logic_and "&" equality  -> and
-
 ?equality: arithmetic
          | equality "=" arithmetic  -> eq
-
 ?arithmetic: term
            | arithmetic "+" term   -> add
            | arithmetic "-" term   -> sub
-
 ?term: factor
      | term "*" factor  -> mul
      | term "/" factor  -> div
-
 ?factor: not_expr
        | factor "^" not_expr  -> pow
-
 ?not_expr: "!" not_expr  -> not
          | "-" not_expr  -> neg
          | base
-
 ?base: NUMBER              -> number
      | FUNC_NAME "(" [expr ("," expr)*] ")" -> func
      | VARIABLE            -> variable
      | "[" [expr ("," expr)*] "]" -> list
      | "(" expr ")"        -> paren
-
-FUNC_NAME: "sin" | "circumcenter" | "cos" | "tan" | "log" | "sqrt" | "integrate" | "dif" | "abs" | "transpose" | "cosec" | "sec" | "cot" | "arctan" | "arcsin" | "arccos"
-
-VARIABLE: "x" | "y" | "z" | "A" | "B" | "C" | "D" | "a" | "b" | "c" | "d" | "f" | "g" | "i" | "n" | "e"
-
+FUNC_NAME: "midpoint" | "mag" | "point1" | "point2" | "point3" | "line1" | "line2" | "line3" | "sin" | "circumcenter" | "eqtri" | "linesegment" | "cos" | "tan" | "log" | "sqrt" | "integrate" | "dif" | "abs" | "transpose" | "cosec" | "sec" | "cot" | "arctan" | "arcsin" | "arccos" | "log10"
+VARIABLE: "x" | "y" | "z" | "A" | "B" | "C" | "D" | "a" | "b" | "c" | "d" | "f" | "g" | "i" | "n" | "e" | "pi"
 %import common.NUMBER
 %import common.WS_INLINE
 %ignore WS_INLINE
 """
-
-
 def take_input(equation, funclist=None):
   global grammar
   equation = copy.copy(equation.replace(" ", ""))
@@ -86,7 +74,6 @@ def take_input(equation, funclist=None):
               output[i] = output[i].replace("FUNC_NAME: ", "FUNC_NAME: " + " | ".join(['"' + x + '"' for x in funclist]) + " | ")
       grammar2 = "\n".join(output)
   parser_main = Lark(grammar2, start='start', parser='lalr')
-  
   parse_tree = parser_main.parse(equation)
   def convert_to_treenode(parse_tree):
       def tree_to_treenode(tree):
@@ -118,12 +105,12 @@ def take_input(equation, funclist=None):
     tmp3 = []
     if funclist is not None:
         tmp3 = funclist
-    return TreeNode("f_"+tree_node.name if tree_node.name in tmp3+["arcsin", "arccos", "arctan", "list", "cosec", "sec", "cot", "or", "not", "and", "circumcenter", "transpose", "eq", "sub", "neg", "inv", "add", "sin", "cos", "tan", "mul", "integrate", "dif", "pow", "div", "log", "abs"]\
+    return TreeNode("f_"+tree_node.name if tree_node.name in tmp3+["eqtri", "linesegment", "midpoint", "mag", "point1", "point2", "point3", "line1", "line2", "line3", "log10", "arcsin", "arccos", "arctan", "list", "cosec", "sec", "cot", "equiv", "or", "not", "and", "circumcenter", "transpose", "eq", "sub", "neg", "inv", "add", "sin", "cos", "tan", "mul", "integrate", "dif", "pow", "div", "log", "abs"]\
                     else "d_"+tree_node.name, [fxchange(child) for child in tree_node.children])
   tree_node = fxchange(tree_node)
   tree_node = replace(tree_node, tree_form("d_e"), tree_form("s_e"))
+  tree_node = replace(tree_node, tree_form("d_pi"), tree_form("s_pi"))
   for i in range(26):
     alpha = ["x", "y", "z"]+[chr(x+ord("a")) for x in range(0,23)]
     tree_node = replace(tree_node, tree_form("d_"+alpha[i]), tree_form("v_"+str(i)))
-  
   return tree_node
